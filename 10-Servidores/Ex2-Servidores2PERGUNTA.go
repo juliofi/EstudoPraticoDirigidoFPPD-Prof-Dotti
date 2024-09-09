@@ -64,14 +64,29 @@ func servidorConc(in chan Request) {
 	}
 }
 
+// servidor que limita o número de threads ativas
+func servidorLimitado(in chan Request, limit int) {
+	sem := make(chan struct{}, limit) // semáforo para limitar o número de goroutines
+
+	for {
+		req := <-in
+		sem <- struct{}{} // bloqueia se o número de threads ativas for igual ao limite
+		go func(r Request) {
+			fmt.Println("                                 trataReq")
+			r.ch_ret <- r.v * 2
+			<-sem // libera uma thread
+		}(req)
+	}
+}
+
 // ------------------------------------
 // main
 func main() {
-	fmt.Println("------ Servidores - criacao dinamica -------")
-	serv_chan := make(chan Request) // CANAL POR ONDE SERVIDOR RECEBE PEDIDOS
-	go servidorConc(serv_chan)      // LANÇA PROCESSO SERVIDOR
-	for i := 0; i < NCL; i++ {      // LANÇA DIVERSOS CLIENTES
+	fmt.Println("------ Servidor com Limite de Threads -------")
+	serv_chan := make(chan Request)
+	go servidorLimitado(serv_chan, Pool) // Limite de 10 threads simultâneas
+	for i := 0; i < NCL; i++ {
 		go cliente(i, serv_chan)
 	}
-	<-make(chan int)
+	<-make(chan int) // Espera indefinidamente
 }
